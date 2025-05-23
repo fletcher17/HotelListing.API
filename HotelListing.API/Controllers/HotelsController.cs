@@ -1,78 +1,123 @@
-﻿using HotelListing.API.Data;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using HotelListing.API.Data;
+using HotelListing.API.Contracts;
+using AutoMapper;
+using HotelListing.API.Models.Hotel;
 
-namespace HotelListing.API.Controllers;
-
-[Route("api/[controller]")]
-[ApiController]
-public class HotelsController : Controller
+namespace HotelListing.API.Controllers
 {
-    private static List<Hotel> hotels = new List<Hotel>
+    [Route("api/[controller]")]
+    [ApiController]
+    public class HotelsController : ControllerBase
     {
-        new Hotel { Id = 1, Name = "Odalys Hotel", Address = "123 Main St", Rating = 4.5 },
-        new Hotel { Id = 2, Name = "Xerox Hotel", Address = "456 Beach Rd", Rating = 4.8 }
-    };
-    // GET: HotelsController
-    [HttpGet]
-    public ActionResult<IEnumerable<Hotel>> Get()
-    {
-        return Ok(hotels);
-    }
 
-    // GET: HotelsController/Details/5
-    [HttpGet("{id}")]
-    public ActionResult<Hotel> Details(int id)
-    {
-        var hotel = hotels.FirstOrDefault(h => h.Id == id);
-        if (hotel == null)
+        private readonly IHotelsRepository _hotelsRepository;
+        private readonly IMapper _mapper;
+
+        public HotelsController(IHotelsRepository hotelsRepository, IMapper mapper)
         {
-            return NotFound();
+            _hotelsRepository = hotelsRepository;
+            this._mapper = mapper;
         }
 
-        return Ok(hotel);
-    }
-
-    // POST: HotelsController/Create
-    [HttpPost]
-    public ActionResult<Hotel> Create([FromBody] Hotel newHotel)
-    {
-        if (hotels.Any(h =>  h.Id == newHotel.Id))
+        // GET: api/Hotels
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<HotelDto>>> GetHotels()
         {
-            return BadRequest("Hotel with this Id already exists");
-        }
-        hotels.Add(newHotel);
-        return CreatedAtAction(nameof(Get), new { id = newHotel.Id }, newHotel);
-    }
-
-    // PUT: HotelsController/Create
-    [HttpPut("{id}")]
-    public ActionResult Put([FromBody]Hotel updateHotel)
-    {
-        var existingHotel = hotels.FirstOrDefault(h => h.Id == updateHotel.Id);
-        if (existingHotel == null)
-        {
-            return NotFound();
+            var hotel = await _hotelsRepository.GetAllAsync();
+            var hotelDto = _mapper.Map<List<HotelDto>>(hotel);
+            return Ok(hotelDto);
         }
 
-        existingHotel.Address = updateHotel.Address;
-        existingHotel.Name = updateHotel.Name;
-        existingHotel.Rating = updateHotel.Rating;
-
-        return NoContent();
-    }
-
-    // DELETE
-    [HttpDelete("{id}")]
-    public ActionResult Delete(int id)
-    {
-        var hotel = hotels.FirstOrDefault(h =>h.Id == id);
-        if(hotel == null)
+        // GET: api/Hotels/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<HotelDto>> GetHotel(int id)
         {
-            return NotFound(new { message = "We no see am"});
-        }
-        hotels.Remove(hotel);
-        return NoContent();
+            var hotel = await _hotelsRepository.GetAsync(id);
 
+            if (hotel == null)
+            {
+                return NotFound();
+            }
+
+            var hotelDto = _mapper.Map<HotelDto>(hotel);
+
+            return hotelDto;
+        }
+
+        // PUT: api/Hotels/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutHotel(int id, HotelDto hotelDto)
+        {
+            if (id != hotelDto.Id)
+            {
+                return BadRequest();
+            }
+
+            //_context.Entry(hotel).State = EntityState.Modified;
+            var hotel = await _hotelsRepository.GetAsync(id);
+            if (hotel == null)
+            {
+                return NotFound();
+            }
+
+            _mapper.Map(hotelDto, hotel);
+
+            try
+            {
+                await _hotelsRepository.UpdateAsync(hotel);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await HotelExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // POST: api/Hotels
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPost]
+        public async Task<ActionResult<Hotel>> PostHotel(CreateHotelDto hotelDto)
+        {
+            var hotel = _mapper.Map<Hotel>(hotelDto);
+            await _hotelsRepository.AddAsync(hotel);
+
+            return CreatedAtAction("GetHotel", new { id = hotel.Id }, hotel);
+        }
+
+        // DELETE: api/Hotels/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteHotel(int id)
+        {
+            var hotel = await _hotelsRepository.GetAsync(id);
+            if (hotel == null)
+            {
+                return NotFound();
+            }
+
+            await _hotelsRepository.DeleteAsync(id);
+
+            return NoContent();
+        }
+
+        private async Task<bool> HotelExists(int id)
+        {
+            return await _hotelsRepository.Exists(id);
+        }
     }
 }
