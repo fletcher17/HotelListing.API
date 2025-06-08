@@ -1,4 +1,5 @@
-﻿using HotelListing.API.Data;
+﻿using Asp.Versioning;
+using HotelListing.API.Data;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,6 +7,7 @@ namespace HotelListing.API.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
+[ApiVersion("1.0")]
 public class HotelsExampleController : Controller
 {
     private static List<Hotel> hotels = new List<Hotel>
